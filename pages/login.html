@@ -1,0 +1,59 @@
+<html><head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script type="text/javascript" src="http://cdnjs.cloudflare.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
+    <script type="text/javascript" src="http://netdna.bootstrapcdn.com/bootstrap/3.3.4/js/bootstrap.min.js"></script>
+    <link href="http://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.3.0/css/font-awesome.min.css" rel="stylesheet" type="text/css">
+
+  </head><body>
+    <div class="cover">
+      <div class="cover-image" style="background-image: url(../img/fondo.png);"></div>
+      <div class="container">
+        <div class="row">
+          <div class="col-sm-12 centrar responsivo">
+            <h3 class="text-center blanco">Riesgo Psicosocial</h3>
+            <h5 class="text-center blanco ">+SSO</h5>
+            <h4 class="blanco text-center">Ingresa con tus datos de acceso</h4>
+            <form role="form" id="frm_login">
+              <div class="form-group">
+                 <input type="text" class="form-control" placeholder="Nombre de Usuario" required="" id="nombre" oninvalid="this.setCustomValidity('Completa un nombre.')" oninput="setCustomValidity('')">
+              </div>
+              <div class="form-group">
+                 <input type="password" class="form-control" placeholder="Clave" required="" id="clave" oninvalid="this.setCustomValidity('Ingresa un mail valido.')" oninput="setCustomValidity('')">
+              </div>
+              <button type="submit" class="btn btn-primary">Entrar</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  <!-- Mainly scripts -->
+    <script src="../js/jquery-2.1.1.js"></script>
+    <script src="../js/axios.min.js"></script>
+
+
+    <script type="text/javascript" src="../cordova.js"></script>
+    <script type="text/javascript" src="../js/app.js"></script>
+
+     <script>
+        
+        $(document).ready(function(){
+           
+            $("#frm_login").submit(function( event ) {
+              var data1 = $("#nombre").val();  
+              var data2 = $("#clave").val();
+              app.enviar_login(data1,data2,function(a){
+                if(a==1){
+                  app.cargar_pagina('admin.html');
+                }else{
+                  alert("Clave errónea");
+                }
+              });
+               event.preventDefault();
+            });
+            
+
+        });
+    </script>
+
+</body></html>
