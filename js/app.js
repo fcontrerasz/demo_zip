@@ -78,23 +78,39 @@ var app = {
     writeLog: function(str) {
       if(!logOb) return;
       var log = str + " [" + (new Date()) + "]\n";
-      console.log("going to log "+log);
+      console.log("Accediendo al archivo: "+log);
       logOb.createWriter(function(fileWriter) {
         fileWriter.seek(fileWriter.length);
         var blob = new Blob([log], {type:'text/plain'});
         fileWriter.write(blob);
-        console.log("ok, in theory i worked");
       }, app.logerror);
     },
 
     inicio: function(){
 
-      alert("inicio");
+      //alert("inicio");
 
       db.transaction(app.validaUsuario, function(err){
         alert("Error base de datos usuarios: "+err.code);
       }); 
 
+    },
+
+    envia_porce_web: function(text) {
+        var parentElement = document.getElementById("deviceready");
+        var listeningElement = parentElement.querySelector('.listening');
+        listeningElement.setAttribute('style', 'display:block;');
+        listeningElement.innerHTML = text;
+    },
+
+    fin_cargador_inicial: function(error, text) {
+        var parentElement = document.getElementById("deviceready");
+        var listeningElement = parentElement.querySelector('.listening');
+        var receivedElement = parentElement.querySelector('.received');
+        listeningElement.setAttribute('style', 'display:none;');
+        receivedElement.setAttribute('style', 'display:block;');
+        if(error) receivedElement.setAttribute('style', 'background-color:#FF2700;');
+        receivedElement.innerHTML = text;
     },
 
     onDeviceResume: function() {
@@ -114,7 +130,7 @@ var app = {
           app.writeLog("App lista con el Log");      
         });
       }, function (err) {
-        console.log("ERROR leyendo el directorio");
+          console.log("ERROR leyendo el directorio");
           console.log(err);
         });
 
@@ -123,7 +139,7 @@ var app = {
       var num_paquete;
 
       appd = new app.Appd(1,app_nombre,device.platform,device.version);
-      alert(JSON.stringify(appd));
+      //alert(JSON.stringify(appd));
         //alert(api);
 
       //  alert(cordova.file.applicationDirectory); 
@@ -131,64 +147,87 @@ var app = {
        //alert(pathname.indexOf('index.html'));
        //alert(app.ruta_aplicativo());
        if(pathname.indexOf('index.html') >= 0 ){
-           db.transaction(app.crear_db, app.errorDB, function(){
-
-            alert("Base de Datos iniciada correctamente");
-
-           });
+            
+            db.transaction(app.crear_db, function(err) {
+              alert("Error en la base de datos: "+err.code+" | "+err.message);
+              app.writeLog("Error en la base de datos: "+err.code+" | "+err.message);    
+              app.Salir(false);
+            }, function(){
+              app.envia_porce_web("Base de Datos iniciada");
+               //alert("Base de Datos iniciada correctamente");
+            });
            
            app.valida_actualizacion_app(function(x){
             if(x){
               throw new Error("App Desactualizada");
               alert("APP obsoleta, lo siento tenemos que cerrar el aplicativo");
+              app.writeLog("APP obsoleta, lo siento tenemos que cerrar el aplicativo");    
               app.Salir(false);
               return false;
-            }else console.log("App buena, está al día");
+            }else{
+                app.envia_porce_web("App al día");
+                console.log("App buena, está al día");
+            } 
             
            app.existe_usuario_db(function(a){
               tiene_usuario = a;
-              alert("Tiene Usuario creado en BD Local: " + tiene_usuario);
-              app.existe_paquete_descargado(function(a,b,c){
+              console.log("Tiene Usuario creado en BD Local: " + tiene_usuario);
+              app.existe_paquete_descargado(function(a,b,c,d){
                 tiene_paquete = a;
-                num_paquete = c;
-                alert("Tiene Paquete creado en BD Local: " + tiene_paquete);
-                if(a){
-                  alert("Obteniendo paquete desde la ruta almacenada en bd local");
-                  alert("Ruta que está en la BD local es: " + b + ", pero vamos a ver si hay algo nuevo en el servidor remoto.");
+                num_paquete = d;
+                console.log("Tiene Paquete creado en BD Local: " + tiene_paquete);
+                if(tiene_paquete){
+                 // alert("Obteniendo paquete desde la ruta almacenada en bd local");
+                  console.log("Ruta que está en la BD local es: " + b + ", pero vamos a ver si hay algo nuevo en el servidor remoto.");
+                  app.envia_porce_web("Comprobando nuevos paquetes");
                   app.probar_internet(function(a){
                   if(a){
-                    app.version_paquete(c, function(a,b,c1){
+                    app.version_paquete(c, function(a,b,c1,d){
 
                             if(a){
-                              alert("Se obtuvo la siguiente ruta desde el servidor, con la version para descargarse: " + b);
+                              
+                              console.log("Se obtuvo la siguiente ruta desde el servidor, con la version para descargarse: " + b);
+
                               if(b==""){
                                 throw new Error("Ruta del paquete viene vacia");
+                                alert("Ruta del paquete viene vacia, adios.");
+                                app.writeLog("Ruta del paquete viene vacia, adios.");  
+                                app.Salir(false);
                                 return false;
                               }
 
-                              if(c1 != num_paquete){
-                                    alert("Tenemos una nueva version del paquete para descargar.");
+                              if(d > num_paquete){ //se  debe solucionar con la fecha
+                                    console.log("Tenemos una nueva version del paquete para descargar.");
+                                    app.envia_porce_web("Hemos encontrado un nuevo paquete");
                                     app.descarga_contenidos(b,c1,function(x,y1){
                                       if(x){
-                                        alert("NUEVA descarga completada");
-                                        db.transaction(function(tx){ app.guardaArchivoDescargado(tx,b,c1,y1,function(a){
+                                        console.log("NUEVA descarga completada");
+                                        app.envia_porce_web("Finalizada, intentando almacenar BD");
+                                        db.transaction(function(tx){ app.guardaArchivoDescargado(tx,b,c1,y1,d,function(a){
                                           if(a){
-
+                                             app.fin_cargador_inicial(false, "Tu aplicación quedó al día");
                                             app.inicio();
 
                                           }else{
                                             alert("no se pudo guardar LA NUEVA descarga en la BD");
+                                            app.fin_cargador_inicial(true,"No se pudo guardar LA NUEVA descarga en la BD");
+                                            app.writeLog("no se pudo guardar LA NUEVA descarga en la BD");
                                             app.Salir(false);
                                           }
 
                                         }) }, app.errorDB);
-                                      }else alert("falló la NUEVA descarga");
+                                      }else{
+                                        alert("Falló la NUEVA descarga");
+                                        app.fin_cargador_inicial(true,"Falló la descarga del nuevo paquete hacia la BD");
+                                        app.Salir(false);
+                                      } 
 
                                     });
 
 
                               }else{
-                                    alert("Los paquetes estan al día, no es necesario bajar nada");
+                                    console.log("Los paquetes estan al día, no es necesario bajar nada");
+                                    app.fin_cargador_inicial(false, "El paquete de tu APP, está al día");
                                     app.inicio();
                               }
 
@@ -198,50 +237,63 @@ var app = {
 
                     });
                   }else{
-                      alert("No tienes internet, no podemos saber si hay algo nuevo en el server - lo siento.");
+                      app.envia_porce_web("No tienes internet, no se pudo validar nuevos paquetes");
+                      console.log("No tienes internet, no podemos saber si hay algo nuevo en el server remoto - lo siento.");
                   } 
                   });
                   //se debe setear la ruta para que se comience a obtener las paginas
                     //app.protocolo_inicio();
                 }else{
-                  alert("no encontrado, vamos a descargar por primera vez el paquete desde internet");
+                  app.envia_porce_web("Descargando paquetes por primera vez");
+                  console.log("no encontrado, vamos a descargar por primera vez el paquete desde internet");
                   app.probar_internet(function(a){
                   if(a){
                     //mandamos 0 para que sepa que tiene que traer la última actualizada.
-                    app.version_paquete("0",function(a,b,c1){
+                    app.version_paquete("0",function(a,b,c1,d){
                         if(a){
-                          alert("bajando paquete con ruta: " + b);
+                          console.log("bajando paquete con ruta: " + b);
                           if(b==""){
                             throw new Error("Ruta del paquete viene vacia");
+                            alert("Ruta del paquete viene vacia, necesitamos tener este paquete para continuar.");
+                            app.writeLog("Ruta del paquete viene vacia, necesitamos tener este paquete para continuar.");
+                            app.Salir(false);
                             return false;
                           }
                           app.descarga_contenidos(b,c1,function(x,y1){
                             if(x){
-                              alert("primera descarga completada");
-                              db.transaction(function(tx){ app.guardaArchivoDescargado(tx,b,c1,y1,function(a){
+                              console.log("primera descarga completada");
+                              app.envia_porce_web("Descarga tarminada, intentando respaldar en BD");
+                              db.transaction(function(tx){ app.guardaArchivoDescargado(tx,b,c1,y1,d,function(a){
                                 if(a){
-
+                                  app.fin_cargador_inicial(false, "Base de datos actualizada");
                                   app.inicio();
-
                                 }else{
                                   alert("no se pudo guardar en la BD");
+                                  app.writeLog("no se pudo guardar en la BD Local, primera vez descargada.");
+                                  app.fin_cargador_inicial(true, "No se pudo guardar en la BD el primer paquete");
                                   app.Salir(false);
                                 }
                               }) }, app.errorDB);
 
                             }else{
-                               alert("por algún motivo, no se logró descargar nada y falló la primera descarga"); 
+                               alert("por algún motivo, no se logró descargar nada y falló la primera descarga");
+                               app.fin_cargador_inicial(true, "No se pudo descargar el primer paquete");
+                               app.writeLog("por algún motivo, no se logró descargar nada y falló la primera descarga.");
                                app.Salir(false);
                             } 
 
                           });
                         }else{
                           alert("No se pudo obtener información del paquete, como es la primera vez no podemos continuar.");
+                          app.fin_cargador_inicial(true, "No se pudo obtener información del paquete inicial");
+                          app.writeLog("No se pudo obtener información del paquete, como es la primera vez no podemos continuar.");
                           app.Salir(false);
                         } 
                     });
                   }else{
-                      alert("No tienes internet, no podemos bajar el paquete - conéctate, te tenemos que sacar desde el aplicativo");
+                      alert("No tienes internet, no podemos bajar el paquete - conéctate y vuelve a intentarlo, te tenemos que sacar desde el aplicativo");
+                      app.writeLog("No tienes internet, no podemos bajar el paquete - conéctate y vuelve a intentarlo, te tenemos que sacar desde el aplicativo");
+                      app.fin_cargador_inicial(true, "No tienes internet, no se puede iniciar");
                       app.Salir(false);
                   } 
                   });
@@ -289,14 +341,21 @@ var app = {
         }
         var appv = v;
         var appn = appd.nombre;
-        axios.get(api+'/updates_app?transform=1&filter[]=APP,eq,'+appn+'&filter[]=version,eq,'+appv)
+        var n_local = appv.split('.').join("");
+
+        console.log("versión actual app: " + n_local);
+        //+'&filter[]=estado_up,eq,1'
+        //+'&filter[]=version,eq,'+appv
+        axios.get(api+'/updates_app?transform=1&filter[]=APP,eq,'+appn+'&filter[]=estado_up,eq,1')
         .then(response => {
             if (typeof response.data === 'undefined' && response.data.length == 0) {
                 console.log("Error al intentar obtener los registros.");
             }else{
                if(response.data["updates_app"]!=""){
                   var json = JSON.parse(JSON.stringify(response.data["updates_app"][0]));
-                  if(json.estado_up == 1){
+                  var nueva_v = json.version.split('.').join("");
+                  console.log("versión del servidor: " + nueva_v);
+                  if(parseInt(nueva_v) > parseInt(n_local)){
                      alert("Tienes una actualización disponible para tu aplicación.");
                      console.log("Abriendo: "+json.url_up);
                      window.open(json.url_up, '_system');
@@ -382,7 +441,7 @@ var app = {
      //usuario = new app.Usuario('Fiesta', 'Ford');
      tx.executeSql('CREATE TABLE IF NOT EXISTS AVANCES (id integer primary key autoincrement, data, t TIMESTAMP DEFAULT CURRENT_TIMESTAMP)');
      tx.executeSql('CREATE TABLE IF NOT EXISTS USUARIO (id, usuario, mail, ruta)');
-     tx.executeSql('CREATE TABLE IF NOT EXISTS ACTUALIZADOR (id integer primary key autoincrement, archivo , paquete, ruta, t TIMESTAMP DEFAULT CURRENT_TIMESTAMP)');
+     tx.executeSql('CREATE TABLE IF NOT EXISTS ACTUALIZADOR (id integer primary key autoincrement, archivo , paquete, ruta, fecha, t TIMESTAMP DEFAULT CURRENT_TIMESTAMP)');
      tx.executeSql('CREATE TABLE IF NOT EXISTS APP (id integer primary key, nombre, plataforma, version)');
      tx.executeSql('INSERT OR IGNORE INTO APP (id, nombre, plataforma, version) VALUES (1,"'+app_nombre+'","'+device.platform+'", "'+device.version+'")');
     },
@@ -392,9 +451,9 @@ var app = {
         tx.executeSql('select * from ACTUALIZADOR', [], function(tx, results){ 
             var len = results.rows.length;
             if(len>0){
-                callback(true, results.rows.item(0).ruta, results.rows.item(0).paquete);
+                callback(true, results.rows.item(0).ruta, results.rows.item(0).paquete, results.rows.item(0).fecha);
             }else{
-                callback(false,"","");
+                callback(false,"","","");
             }
             
         }, app.errorDB);
@@ -428,7 +487,7 @@ var app = {
         {
           console.log("Axios NO existe");
           throw new Error("Axios NO EXISTE");
-          callback(0,"","");
+          callback(0,"","","");
         }
         var appn = appd.nombre;
         //axios.get(api+'/paquete_app?transform=1&filter[]=APP,eq,'+appn+'&filter[]=paquete,eq,'+num)
@@ -440,9 +499,10 @@ var app = {
               var data = response.data["paquete_app"];
                if(data!=""){
                   var json = JSON.parse(JSON.stringify(data[0]));
-                  callback(1,json.url_up, json.paquete);
+                  //alert("Fecha desde servidor: " + json.fecha);
+                  callback(1,json.url_up, json.paquete, json.fecha);
                }else{
-                  callback(0,"","");
+                  callback(0,"","","");
                }
             }
         })
@@ -463,8 +523,8 @@ var app = {
         });
     },
 
-    guardaArchivoDescargado: function(tx, archivo, paquete, ruta, callback){
-      tx.executeSql('INSERT INTO ACTUALIZADOR (archivo , paquete, ruta) VALUES ("'+archivo+'", "'+paquete+'", "'+ruta+'")',[], 
+    guardaArchivoDescargado: function(tx, archivo, paquete, ruta, fecha, callback){
+      tx.executeSql('INSERT INTO ACTUALIZADOR (archivo , paquete, ruta, fecha ) VALUES ("'+archivo+'", "'+paquete+'", "'+ruta+'", "'+fecha+'")',[], 
         function(transaction, result) {
                 console.log(result.insertId);
                 callback(true);
@@ -555,26 +615,39 @@ var app = {
 
     descarga_contenidos: function(url,nombre,callback){
 
+    //  app.cargar_pagina("descargar.html");
+
       var correl = new Date().valueOf();
 
+      //ele_porc = document.getElementById("porcentaje");
+
+      app.envia_porce_web("Iniciando la Descarga de Paquetes");
 
       let permissions = cordova.plugins.permissions;
 
       console.log("Revisado los permisos");
       console.log(permissions);
 
+      app.envia_porce_web("Revisando permisos");
+
       var ft = new FileTransfer();
       ft.onprogress = function(progressEvent) {
           if (progressEvent.lengthComputable) {
               var perc = Math.floor(progressEvent.loaded / progressEvent.total * 100);
+              //ele_porc.innerHTML = "Bajando "+perc+"%";
+              app.envia_porce_web("Descargando: "+perc+"%");
               console.log("Descargando: "+perc);
           }
       };
 
       var ProgressCallback = function(progressEvent){
       var percent =  Math.round((progressEvent.loaded / progressEvent.total) * 100);
+            //ele_porc.innerHTML = "Descomprimiendo "+perc+"%";
+            app.envia_porce_web("Descomprimiendo: "+percent+"%");
             console.log(percent + "%");
       };
+
+      //alert(document.getElementById("porcentaje"));
 
       permissions.checkPermission(permissions.READ_EXTERNAL_STORAGE, function(status){
         console.log('Revisando Permisos READ_EXTERNAL_STORAGE');
@@ -584,11 +657,12 @@ var app = {
         }else{
           console.log('Tiene Permisos READ_EXTERNAL_STORAGE');
           cordova.plugins.diagnostic.getExternalSdCardDetails(function(details){
-              alert(JSON.stringify(details));
+             // app.writeLog(JSON.stringify(details));
               console.log(details);
               details.forEach(function(detail){
                 //&& details.freeSpace > 100000
-                alert("En "+detail.path+", puede escribir: " + detail.canWrite+ ", espacio disponible: " + detail.freeSpace );
+                //alert("En "+detail.path+", puede escribir: " + detail.canWrite+ ", espacio disponible: " + detail.freeSpace );
+                app.writeLog("En "+detail.path+", puede escribir: " + detail.canWrite+ ", espacio disponible: " + detail.freeSpace );
                   if(detail.canWrite && detail.freeSpace > 100000 && detail.type == "application"){
                       cordova.file.externalSdCardDirectory = detail.filePath;
                       console.log(JSON.stringify(cordova.file));
@@ -596,6 +670,8 @@ var app = {
                         if(cordova.file.externalDataDirectory == null){
                           alert("External Data NO Existe");
                           throw new Error("External Data NO Existe");
+                          app.fin_cargador_inicial(true, "No tienes tarjeta externa, no se pudo instalar.");
+                          app.writeLog("External Data NO Existe en el celular.");
                           callback(false,"");
                         }
 
@@ -625,7 +701,7 @@ var app = {
 
                               var updatedir = "app"+nombre;
 
-                              alert("Nombre del directorio: " + updatedir);
+                              console.log("Nombre del directorio: " + updatedir);
 
                               fileSystem.root.getDirectory(updatedir+'/', {create: true}, function (dirEntry) {
                                   fileSystem.root.getDirectory(updatedir+'/pages/', {create: true}, function (dirUser) {
@@ -644,6 +720,7 @@ var app = {
                                                console.log("resultado zip: " + code);
                                                if(code == 0){
                                                     console.log("Archivo descomprimido con exito.");
+                                                    app.fin_cargador_inicial(false, "Archivo descomprimido con éxito");
                                                     var ruta_final = cordova.file.externalSdCardDirectory + "/" +updatedir;
                                                     app.listDir(ruta_final);
                                                     callback(true,ruta_final);
@@ -651,6 +728,8 @@ var app = {
                                                if(code == -1){
                                                     throw new Error("No se pudo descomprimir.");
                                                     alert("No pudo ser descomprimido el archivo");
+                                                    app.fin_cargador_inicial(true, "Error al descomprimir el archivo");
+                                                    app.writeLog("No se pudo descomprimir en el celular.");
                                                     callback(false,"");
                                                }
                                                
@@ -659,20 +738,22 @@ var app = {
                                            //cordova.file.applicationDirectory = ruta WWW nativa
                                            //cordova.file.dataDirectory = Ruta Data 
 
-                                      }, function(err) { callback(false,""); alert("Descarga falló: " + JSON.stringify(err)); });
-                                  }, function(err) { callback(false,""); alert("2do nivel no captado: " + JSON.stringify(err)); });
-                              }, function(err) { callback(false,""); alert("1er nivel no captado: " + JSON.stringify(err)); });
-                          }, function(err) { callback(false,""); alert("solicitud rechazada: " + JSON.stringify(err)); }); 
+                                      }, function(err) { callback(false,""); alert("Descarga falló: " + JSON.stringify(err)); app.writeLog("Descarga falló: " + JSON.stringify(err)); app.fin_cargador_inicial(true, "Error al desargar"); });
+                                  }, function(err) { callback(false,""); alert("2do nivel no captado: " + JSON.stringify(err)); app.writeLog("2do nivel no captado: " + JSON.stringify(err)); app.fin_cargador_inicial(true, "Error al desargar"); });
+                              }, function(err) { callback(false,""); alert("1er nivel no captado: " + JSON.stringify(err)); app.writeLog("1er nivel no captado: " + JSON.stringify(err)); app.fin_cargador_inicial(true, "Error al desargar"); });
+                          }, function(err) { callback(false,""); alert("solicitud rechazada: " + JSON.stringify(err)); app.writeLog("solicitud rechazada: " + JSON.stringify(err)); app.fin_cargador_inicial(true, "Solitud rechazada"); }); 
 
 
 
 
 
                   }else{
-                    alert("Super error, no se puede escribir en la memoria, no tiene espacio libre la SD o no existe una ruta Android");
+                    console.log("Super error, no se puede escribir en la memoria, no tiene espacio libre la SD o no existe una ruta Android");
+                    app.writeLog("Super error, no se puede escribir en la memoria, no tiene espacio libre la SD o no existe una ruta Android");
                   }
               });
           }, function(error){
+              app.writeLog("Error desde el plugin cordova.plugins.diagnostic: "+error);
               console.error("Error desde el plugin cordova.plugins.diagnostic: "+error);
               callback(false);
           });
